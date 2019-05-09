@@ -189,6 +189,54 @@ if [ "$CATKIN_LINT" == "true" ] || [ "$CATKIN_LINT" == "pedantic" ]; then
     ici_time_end  # catkin_lint
 fi
 
+# create coverage reports
+if [ "${COVERAGE_PKGS// }" != "" ]; then
+    ici_time_start catkin_coverage
+
+    coverages=()
+    coverage_pass=true
+
+    catkin config --cmake-args -DENABLE_COVERAGE_TESTING=ON -DCMAKE_BUILD_TYPE=Debug
+    catkin build
+    for pkg in $COVERAGE_PKGS; do
+        echo "Creating coverage for [$pkg]"
+        catkin build $pkg -v --no-deps --catkin-make-args ${pkg}_coverage
+        cd $TARGET_REPO_PATH
+        echo "Coverage summary for $pkg ----------------------"
+        lcov --extract /root/catkin_ws/build/$pkg/${pkg}_coverage.info '/root/catkin_ws/src/*' > /root/catkin_ws/build/$pkg/${pkg}_coverage_cleaned.info
+        echo "---------------------------------------------------"
+
+        line_cov_percentage=$(lcov --summary /root/catkin_ws/build/$pkg/${pkg}_coverage_cleaned.info 2>&1 | grep -Poi "lines\.*: \K[0-9.]*")
+
+        if [ "$line_cov_percentage" != "100.0" ]; then
+            echo "$pkg has $line_cov_percentage% line coverage";
+            coverages+=("$pkg ($line_cov_percentage%) \e[${ANSI_RED}m[failed]\e[0m")
+            coverage_pass=false
+        else
+            echo $pkg " has 100.0% line coverage";
+            coverages+=("$pkg ($line_cov_percentage%) \e[${ANSI_GREEN}m[pass]\e[0m")
+        fi
+
+    done
+
+    if [ "${coverages// }" != "" ]; then
+        echo "Coverage results:"
+        for coverages in "${coverages[@]}"; do
+            echo -e '  ' $coverages
+        done
+    fi
+
+    # Exit on fail
+    if [ "$coverage_pass" == false ]; then
+        exit 1
+    fi
+
+    exit 0;
+
+    ici_time_end
+fi
+
+
 ici_time_start catkin_build
 
 # for catkin
