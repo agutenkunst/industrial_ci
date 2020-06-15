@@ -97,6 +97,16 @@ function run_clang_tidy_check {
     fi
 }
 
+function upload_to_codecovio {
+  ici_setup_git_client
+  ici_install_pkgs_for_command curl curl
+  local target_ws=$1
+  cd "$target_ws" || return 1
+  bash <(curl -s https://codecov.io/bash) \
+    -Z -R ./src/*/ # exit with 1 when unsuccessful
+                   # point to the git workspace to avoid additional path fixes
+}
+
 function run_source_tests {
     # shellcheck disable=SC1090
     source "${ICI_SRC_PATH}/builders/$BUILDER.sh" || ici_error "Builder '$BUILDER' not supported"
@@ -125,6 +135,9 @@ function run_source_tests {
     if [ "${CLANG_TIDY:-false}" != false ]; then
         TARGET_CMAKE_ARGS="$TARGET_CMAKE_ARGS -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
     fi
+    if [ -n "$CODE_COVERAGE" ]; then
+        TARGET_CMAKE_ARGS="$TARGET_CMAKE_ARGS -DCMAKE_C_FLAGS='--coverage' -DCMAKE_CXX_FLAGS='--coverage'"
+    fi
     ici_with_ws "$target_ws" ici_build_workspace "target" "$extend" "$target_ws"
 
     if [ "$NOT_TEST_BUILD" != "true" ]; then
@@ -143,6 +156,16 @@ function run_source_tests {
     fi
     if [ "${CLANG_TIDY:-false}" != false ]; then
         run_clang_tidy_check "$target_ws"
+    fi
+
+    if [ -n "${CODE_COVERAGE}" ]; then
+        case "${CODE_COVERAGE}" in
+        "codecov.io")
+            ici_run "upload_to_codecovio" upload_to_codecovio "$target_ws"
+            ;;
+        *)
+            ;;
+        esac
     fi
 
     extend="$target_ws/install"

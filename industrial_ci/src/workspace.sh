@@ -303,6 +303,12 @@ function ici_test_workspace {
     local extend=$1; shift
     local ws=$1; shift
 
-    ici_run "run_${name}_test" builder_run_tests "$extend" "$ws"
+    # Python coverage only support colcon builder in ROS2
+    if [ "${name}" = "target" ] && [ -n "$CODE_COVERAGE" ] && [ "$BUILDER" = "colcon" ]; then
+      ici_run "run_${name}_test_with_coverage" builder_run_tests_with_coverage "$extend" "$ws"
+    else
+      ici_run "run_${name}_test" builder_run_tests "$extend" "$ws"
+    fi
+
     builder_test_results "$extend" "$ws"
 }

@@ -73,6 +73,13 @@ function ici_run_cmd_in_docker() {
   local commit_image=$DOCKER_COMMIT
   unset DOCKER_COMMIT
 
+  #enable codecov in docker container
+  if [ "$CODE_COVERAGE" = "codecov.io" ]; then
+      # shellcheck disable=SC2207
+      run_opts+=($(bash <(curl -s https://codecov.io/env)))
+
+  fi
+
   #forward ssh agent into docker container
   if [ "$SSH_AUTH_SOCK" ]; then
      local auth_dir
