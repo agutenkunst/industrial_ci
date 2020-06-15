@@ -100,10 +100,37 @@ function run_clang_tidy_check {
 function upload_to_codecovio {
   ici_setup_git_client
   ici_install_pkgs_for_command curl curl
+  ici_install_pkgs_for_command lcov lcov
   local target_ws=$1
   cd "$target_ws" || return 1
+  # Set zero counter
+  lcov --capture --initial \
+       --directory build \
+       --output-file initial_coverage.info | grep -ve "^Processing"
+  # Capture cpp coverage info
+  lcov --capture \
+       --directory build \
+       --output-file test_coverage.info | grep -ve "^Processing"
+  lcov \
+    --add-tracefile initial_coverage.info \
+    --add-tracefile test_coverage.info \
+    --output-file coverage.info \
+    && rm initial_coverage.info test_coverage.info
+  # Extract repository files
+  lcov --extract coverage.info "$(pwd)/src/*/*" \
+       --output-file coverage.info | grep -ve "^Extracting"
+  # Filter out test files
+  lcov --remove coverage.info "*/test/*" \
+       --output-file coverage.info | grep -ve "^Removing"
+  local lcov_report; lcov_report="$(pwd)/coverage.info"
+  local pytest_reports; pytest_reports=$(find "$target_ws/build" \
+                                              -type f \
+                                              -name "coverage.xml" \
+                                              -printf "$(pwd)/%P ")
+  echo "Report found! $lcov_report $pytest_reports"
   bash <(curl -s https://codecov.io/bash) \
-    -Z -R ./src/*/ # exit with 1 when unsuccessful
+    -Z -X gcov \
+       -R ./src/*/ # exit with 1 when unsuccessful
                    # point to the git workspace to avoid additional path fixes
 }
 
