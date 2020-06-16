@@ -97,41 +97,69 @@ function run_clang_tidy_check {
     fi
 }
 
-function upload_to_codecovio {
-  ici_setup_git_client
-  ici_install_pkgs_for_command curl curl
+function run_lcov {
   ici_install_pkgs_for_command lcov lcov
   local target_ws=$1
   cd "$target_ws" || return 1
-  # Set zero counter
+  # Capture initial coverage info
   lcov --capture --initial \
        --directory build \
        --output-file initial_coverage.info | grep -ve "^Processing"
-  # Capture cpp coverage info
+  # Capture tested coverage info
   lcov --capture \
        --directory build \
        --output-file test_coverage.info | grep -ve "^Processing"
-  lcov \
-    --add-tracefile initial_coverage.info \
-    --add-tracefile test_coverage.info \
-    --output-file coverage.info \
+  # Combine two report
+  lcov --add-tracefile initial_coverage.info \
+       --add-tracefile test_coverage.info \
+       --output-file coverage.info \
     && rm initial_coverage.info test_coverage.info
   # Extract repository files
   lcov --extract coverage.info "$(pwd)/src/*/*" \
        --output-file coverage.info | grep -ve "^Extracting"
   # Filter out test files
   lcov --remove coverage.info "*/test/*" \
-       --output-file coverage.info | grep -ve "^Removing"
+       --output-file coverage.info | grep -ve "^removing"
+}
+
+function upload_coverage_report {
+  local target_ws=$1; shift
+  local coverage_report_tool=$1
+
+  ici_setup_git_client
+  ici_install_pkgs_for_command curl curl
+
+  run_lcov "$target_ws"
+
+  cd "$target_ws" || return 1
   local lcov_report; lcov_report="$(pwd)/coverage.info"
-  local pytest_reports; pytest_reports=$(find "$target_ws/build" \
-                                              -type f \
-                                              -name "coverage.xml" \
-                                              -printf "$(pwd)/%P ")
-  echo "Report found! $lcov_report $pytest_reports"
-  bash <(curl -s https://codecov.io/bash) \
-    -Z -X gcov \
-       -R ./src/*/ # exit with 1 when unsuccessful
-                   # point to the git workspace to avoid additional path fixes
+  IFS=" " read -r -a pytest_reports <<< \
+    "$(find "$target_ws/build" \
+             -type f \
+             -name ".coverage" \
+             -printf "%p ")"
+  echo Reports found! "$lcov_report" "${pytest_reports[@]}"
+
+  case "$coverage_report_tool" in
+    "codecov.io")
+      bash <(curl -s https://codecov.io/bash) \
+           -Z -X gcov \
+           -R ./src/*/ # exit with 1 when unsuccessful
+                       # point to the git workspace to avoid additional path fixes
+      ;;
+    "coveralls.io")
+      cd "$(eval echo "$target_ws"/src/*)" || return 1
+      ici_install_pkgs_for_command pip python3-pip python3-dev python3-wheel
+      ici_install_pkgs_for_command gem ruby
+      python3 -m pip install coveralls coveralls-merge
+      gem install coveralls-lcov
+      coveralls-lcov -v -n "$target_ws/coverage.info" > coverage.c.json
+      cp "${pytest_reports[0]}" .
+      coveralls-merge coverage.c.json
+
+  esac
+
+
 }
 
 function run_source_tests {
@@ -186,13 +214,7 @@ function run_source_tests {
     fi
 
     if [ -n "${CODE_COVERAGE}" ]; then
-        case "${CODE_COVERAGE}" in
-        "codecov.io")
-            ici_run "upload_to_codecovio" upload_to_codecovio "$target_ws"
-            ;;
-        *)
-            ;;
-        esac
+        ici_run "upload_to_$CODE_COVERAGE" upload_coverage_report "$target_ws" "$CODE_COVERAGE"
     fi
 
     extend="$target_ws/install"
