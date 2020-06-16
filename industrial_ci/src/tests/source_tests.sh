@@ -143,8 +143,9 @@ function ici_combine_python_reports {
   # Combine coverage files
   python3 -m coverage combine
   # Generate report
-  python3 -m coverage report --omit=*/test/*,*/setup.py,*/__init__.py
-  python3 -m coverage xml --omit=*/test/*,*/setup.py,*/__init__.py
+  printf "[report]\nomit = \n\t*/test/*\n\t*/setup.py" > .default.coveragerc
+  python3 -m coverage report --rcfile=.default.coveragerc
+  python3 -m coverage xml --rcfile=.default.coveragerc
 }
 
 function upload_coverage_report {
@@ -176,10 +177,10 @@ function upload_coverage_report {
       cp "$python_report" ./ || echo "No python coverage report"
       ici_install_pkgs_for_command pip python3-pip python3-dev python3-wheel
       ici_install_pkgs_for_command gem ruby
-      python3 -m pip install coveralls coveralls-merge
+      python3 -m pip install coveralls
       gem install coveralls-lcov
       coveralls-lcov -v -n "$target_ws/coverage.info" > coverage.c.json
-      coveralls-merge coverage.c.json
+      coveralls --merge=coverage.c.json --rcfile="$target_ws"/.default.coveragerc
   esac
   cd "$target_ws" || return 1
 }
