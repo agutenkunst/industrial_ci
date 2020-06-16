@@ -97,7 +97,7 @@ function run_clang_tidy_check {
     fi
 }
 
-function run_lcov {
+function ici_combine_cpp_reports {
   ici_install_pkgs_for_command lcov lcov
   local target_ws=$1
   cd "$target_ws" || return 1
@@ -120,6 +120,31 @@ function run_lcov {
   # Filter out test files
   lcov --remove coverage.info "*/test/*" \
        --output-file coverage.info | grep -ve "^removing"
+  lcov --list coverage.info
+}
+
+function ici_combine_python_reports {
+  ici_install_pkgs_for_command coverage python3-coverage python3-dev python3-wheel
+  local target_ws=$1
+  cd "$target_ws" || return 1
+  # Find all .coverage file
+  IFS=" " read -r -a python_reports <<< \
+    "$(find "$target_ws/build" \
+             -type f \
+             -name ".coverage" \
+             -printf "%p ")"
+  # Copy coverage file into workspace and
+  # convert names from .coverage to .coverage.0/1/2
+  local arraylength=${#python_reports[@]}
+  for (( i=1; i<arraylength+1; i++ ));
+  do
+    cp "${python_reports[$i-1]}" .coverage."$i"
+  done
+  # Combine coverage files
+  python3 -m coverage combine
+  # Generate report
+  python3 -m coverage report --omit=*/test/*,*/setup.py,*/__init__.py
+  python3 -m coverage xml --omit=*/test/*,*/setup.py,*/__init__.py
 }
 
 function upload_coverage_report {
@@ -129,37 +154,34 @@ function upload_coverage_report {
   ici_setup_git_client
   ici_install_pkgs_for_command curl curl
 
-  run_lcov "$target_ws"
+  ici_combine_cpp_reports "$target_ws"
+  ici_combine_python_reports "$target_ws"
 
   cd "$target_ws" || return 1
   local lcov_report; lcov_report="$(pwd)/coverage.info"
-  IFS=" " read -r -a pytest_reports <<< \
-    "$(find "$target_ws/build" \
-             -type f \
-             -name ".coverage" \
-             -printf "%p ")"
-  echo Reports found! "$lcov_report" "${pytest_reports[@]}"
+  local python_report; python_report="$(pwd)/.coverage"
+  local python_xml_report; python_xml_report="$(pwd)/coverage.xml"
 
+  cd "$target_ws"/src/* || return 1
+  cp "$lcov_report" ./ || echo "No cpp coverage report"
   case "$coverage_report_tool" in
     "codecov.io")
+      cp "$python_xml_report" ./ || echo "No python coverage report"
       bash <(curl -s https://codecov.io/bash) \
-           -Z -X gcov \
-           -R ./src/*/ # exit with 1 when unsuccessful
-                       # point to the git workspace to avoid additional path fixes
+           -Z \
+           -R ./ # exit with 1 when unsuccessful
+                 # point to the git workspace to avoid additional path fixes
       ;;
     "coveralls.io")
-      cd "$(eval echo "$target_ws"/src/*)" || return 1
+      cp "$python_report" ./ || echo "No python coverage report"
       ici_install_pkgs_for_command pip python3-pip python3-dev python3-wheel
       ici_install_pkgs_for_command gem ruby
       python3 -m pip install coveralls coveralls-merge
       gem install coveralls-lcov
       coveralls-lcov -v -n "$target_ws/coverage.info" > coverage.c.json
-      cp "${pytest_reports[0]}" .
       coveralls-merge coverage.c.json
-
   esac
-
-
+  cd "$target_ws" || return 1
 }
 
 function run_source_tests {
