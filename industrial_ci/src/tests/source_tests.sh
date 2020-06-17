@@ -109,10 +109,10 @@ function ici_combine_cpp_reports {
   lcov --capture \
        --directory build \
        --output-file test_coverage.info | grep -ve "^Processing"
-  # Combine two report
+  # Combine two report (exit function  when none of the records are valid)
   lcov --add-tracefile initial_coverage.info \
        --add-tracefile test_coverage.info \
-       --output-file coverage.info \
+       --output-file coverage.info || return 0 \
     && rm initial_coverage.info test_coverage.info
   # Extract repository files
   lcov --extract coverage.info "$(pwd)/src/*/*" \
@@ -136,16 +136,18 @@ function ici_combine_python_reports {
   # Copy coverage file into workspace and
   # convert names from .coverage to .coverage.0/1/2
   local arraylength=${#python_reports[@]}
-  for (( i=1; i<arraylength+1; i++ ));
-  do
-    cp "${python_reports[$i-1]}" .coverage."$i"
-  done
-  # Combine coverage files
-  python3 -m coverage combine
-  # Generate report
-  printf "[report]\nomit = \n\t*/test/*\n\t*/setup.py" > .default.coveragerc
-  python3 -m coverage report --rcfile=.default.coveragerc
-  python3 -m coverage xml --rcfile=.default.coveragerc
+  if [ "$arraylength" != "0" ]; then
+    for (( i=1; i<arraylength+1; i++ ));
+    do
+      cp "${python_reports[$i-1]}" .coverage."$i"
+    done
+    # Combine coverage files
+    python3 -m coverage combine
+    # Generate report
+    printf "[report]\nomit = \n\t*/test/*\n\t*/setup.py" > .default.coveragerc
+    python3 -m coverage report --rcfile=.default.coveragerc || return 0
+    python3 -m coverage xml --rcfile=.default.coveragerc
+  fi
 }
 
 function upload_coverage_report {
