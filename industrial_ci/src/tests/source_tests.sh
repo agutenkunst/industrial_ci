@@ -216,7 +216,7 @@ function run_source_tests {
         TARGET_CMAKE_ARGS="$TARGET_CMAKE_ARGS -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
     fi
     if [ -n "$CODE_COVERAGE" ]; then
-        TARGET_CMAKE_ARGS="$TARGET_CMAKE_ARGS -DCMAKE_C_FLAGS='--coverage' -DCMAKE_CXX_FLAGS='--coverage'"
+        TARGET_CMAKE_ARGS="$TARGET_CMAKE_ARGS -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS='--coverage' -DCMAKE_CXX_FLAGS='--coverage'"
     fi
     ici_with_ws "$target_ws" ici_build_workspace "target" "$extend" "$target_ws"
 
