@@ -115,7 +115,7 @@ function ici_combine_cpp_reports {
        --output-file coverage.info || return 0 \
     && rm initial_coverage.info test_coverage.info
   # Extract repository files
-  lcov --extract coverage.info "$(pwd)/src/*/*" \
+  lcov --extract coverage.info "$(pwd)/src/$TARGET_REPO_NAME/*" \
        --output-file coverage.info | grep -ve "^Extracting"
   # Filter out test files
   lcov --remove coverage.info "*/test/*" \
@@ -165,7 +165,7 @@ function upload_coverage_report {
   local python_report; python_report="$(pwd)/.coverage"
   local python_xml_report; python_xml_report="$(pwd)/coverage.xml"
 
-  cd "$target_ws"/src/* || return 1
+  cd "$target_ws"/src/"$TARGET_REPO_NAME" || return 1
   cp "$lcov_report" ./ || echo "No cpp coverage report"
   case "$coverage_report_tool" in
     "codecov.io")
