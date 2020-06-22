@@ -118,6 +118,8 @@ function ici_combine_cpp_reports {
   # Filter out test files
   lcov --remove coverage.info "*/test/*" \
        --output-file coverage.info | grep -ve "^removing"
+  # Some sed magic to remove identifiable absolute path
+  sed -i "s~$(pwd)/src/$TARGET_REPO_NAME/~~g" coverage.info
   lcov --list coverage.info
 }
 
