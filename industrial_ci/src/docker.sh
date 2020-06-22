@@ -73,13 +73,9 @@ function ici_run_cmd_in_docker() {
   local commit_image=$DOCKER_COMMIT
   unset DOCKER_COMMIT
 
-  #enable codecov in docker container
-  if [ "$CODE_COVERAGE" = "codecov.io" ]; then
-      # shellcheck disable=SC2207
-      run_opts+=($(bash <(curl -s https://codecov.io/env)))
-  elif [ "$CODE_COVERAGE" = "coveralls.io" ]; then
-      # shellcheck disable=SC2207
-      run_opts+=($(bash "${ICI_SRC_PATH}"/coverage/coveralls_docker_env.sh))
+  # mount coverage report folder
+  if [ "$CODE_COVERAGE" ]; then
+    run_opts+=(-v "$TARGET_REPO_PATH/.ici_coverage_report:/root/.ici_coverage_report" -e "COVERAGE_REPORT_PATH=/root/.ici_coverage_report")
   fi
 
   #forward ssh agent into docker container
