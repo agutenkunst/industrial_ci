@@ -99,8 +99,6 @@ function run_clang_tidy_check {
 
 function ici_combine_cpp_reports {
   ici_install_pkgs_for_command lcov lcov
-  local target_ws=$1
-  cd "$target_ws" || return 1
   # Capture initial coverage info
   lcov --capture --initial \
        --directory build \
@@ -125,11 +123,9 @@ function ici_combine_cpp_reports {
 
 function ici_combine_python_reports {
   ici_install_pkgs_for_command coverage python3-coverage python3-dev python3-wheel
-  local target_ws=$1
-  cd "$target_ws" || return 1
   # Find all .coverage file
   IFS=" " read -r -a python_reports <<< \
-    "$(find "$target_ws/build" \
+    "$(find "./build" \
              -type f \
              -name ".coverage" \
              -printf "%p ")"
@@ -144,47 +140,46 @@ function ici_combine_python_reports {
     # Combine coverage files
     python3 -m coverage combine
     # Generate report
-    printf "[report]\nomit = \n\t*/test/*\n\t*/setup.py" > .default.coveragerc
-    python3 -m coverage report --rcfile=.default.coveragerc || return 0
-    python3 -m coverage xml --rcfile=.default.coveragerc
+    python3 -m coverage report --omit=*/test/*,*/setup.py || return 0
+    python3 -m coverage xml --omit=*/test/*,*/setup.py
   fi
 }
 
-function upload_coverage_report {
+function ici_collect_coverage_report {
   local target_ws=$1; shift
   local coverage_report_tool=$1
 
-  ici_setup_git_client
-  ici_install_pkgs_for_command curl curl
+  # Run combine reports command securely
+  # within workspace directory
+  ( cd "$target_ws" && \
+    ici_combine_cpp_reports && \
+    ici_combine_python_reports )
 
-  ici_combine_cpp_reports "$target_ws"
-  ici_combine_python_reports "$target_ws"
-
-  cd "$target_ws" || return 1
-  local lcov_report; lcov_report="$(pwd)/coverage.info"
-  local python_report; python_report="$(pwd)/.coverage"
-  local python_xml_report; python_xml_report="$(pwd)/coverage.xml"
-
-  cd "$target_ws"/src/"$TARGET_REPO_NAME" || return 1
-  cp "$lcov_report" ./ || echo "No cpp coverage report"
   case "$coverage_report_tool" in
-    "codecov.io")
-      cp "$python_xml_report" ./ || echo "No python coverage report"
-      bash <(curl -s https://codecov.io/bash) \
-           -Z \
-           -R ./ # exit with 1 when unsuccessful
-                 # point to the git workspace to avoid additional path fixes
-      ;;
     "coveralls.io")
-      cp "$python_report" ./ || echo "No python coverage report"
-      ici_install_pkgs_for_command pip python3-pip python3-dev python3-wheel
-      ici_install_pkgs_for_command gem ruby
-      python3 -m pip install coveralls
-      gem install coveralls-lcov
-      coveralls-lcov -v -n "$target_ws/coverage.info" > coverage.c.json
-      coveralls --merge=coverage.c.json --rcfile="$target_ws"/.default.coveragerc
+      # Expose .coverage file
+      cp "$target_ws"/.coverage "$COVERAGE_REPORT_PATH" || echo "No python coverage report"
+      # Expose coveragerc file used for coveralls ignore
+      printf "[report]\nomit = \n\t*/test/*\n\t*/setup.py" > \
+        "$COVERAGE_REPORT_PATH"/.default.coveragerc
+      if [ -f "$target_ws"/coverage.info ]; then
+        # Install and run coveralls-lcov within git directory
+        cp "$target_ws"/coverage.info "$target_ws/src/$TARGET_REPO_NAME"
+        ici_setup_git_client
+        ici_install_pkgs_for_command gem ruby
+        gem install coveralls-lcov
+        ( cd "$target_ws/src/$TARGET_REPO_NAME" && \
+          coveralls-lcov coverage.info > \
+          "$COVERAGE_REPORT_PATH"/coverage.c.json )
+      else
+        echo "No cpp covearge report"
+      fi
+      ;;
+    *) # Expose LCOV and Cobertura XML files by default
+      cp "$target_ws"/coverage.info "$COVERAGE_REPORT_PATH" || echo "No cpp coverage report"
+      cp "$target_ws"/coverage.xml "$COVERAGE_REPORT_PATH" || echo "No python coverage report"
+      ;;
   esac
-  cd "$target_ws" || return 1
 }
 
 function run_source_tests {
@@ -239,7 +234,7 @@ function run_source_tests {
     fi
 
     if [ -n "${CODE_COVERAGE}" ]; then
-        ici_run "upload_to_$CODE_COVERAGE" upload_coverage_report "$target_ws" "$CODE_COVERAGE"
+        ici_run "collect_target_coverage_report" ici_collect_coverage_report "$target_ws" "$CODE_COVERAGE"
     fi
 
     extend="$target_ws/install"
