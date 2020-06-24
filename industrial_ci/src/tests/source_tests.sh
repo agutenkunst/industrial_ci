@@ -124,23 +124,15 @@ function ici_combine_cpp_reports {
 }
 
 function ici_combine_python_reports {
-  ici_install_pkgs_for_command coverage python3-coverage python3-dev python3-wheel
   # Find all .coverage file
-  IFS=" " read -r -a python_reports <<< \
-    "$(find "./build" \
-             -type f \
-             -name ".coverage" \
-             -printf "%p ")"
-  # Copy coverage file into workspace and
-  # convert names from .coverage to .coverage.0/1/2
-  local arraylength=${#python_reports[@]}
-  if [ "$arraylength" != "0" ]; then
-    for (( i=1; i<arraylength+1; i++ ));
-    do
-      cp "${python_reports[$i-1]}" .coverage."$i"
-    done
-    # Combine coverage files
-    python3 -m coverage combine
+  local python_reports
+  python_reports=$(find "./build" \
+                        -type f \
+                        -name ".coverage" \
+                        -printf "%p ")
+  IFS=" " read -r -a python_reports <<< "$python_reports"
+  # Combine coverage files
+  if "$PYTHON_VERSION_NAME" -m coverage combine "${python_reports[@]}"; then
     # Generate report
     python3 -m coverage report --omit=*/test/*,*/setup.py || return 0
     python3 -m coverage xml --omit=*/test/*,*/setup.py
@@ -213,7 +205,9 @@ function run_source_tests {
         TARGET_CMAKE_ARGS="$TARGET_CMAKE_ARGS -DCMAKE_EXPORT_COMPILE_COMMANDS=ON"
     fi
     if [ -n "$CODE_COVERAGE" ]; then
+        ici_install_pkgs_for_command coverage "$PYTHON_VERSION_NAME-coverage"
         TARGET_CMAKE_ARGS="$TARGET_CMAKE_ARGS -DCMAKE_BUILD_TYPE=Debug -DCMAKE_C_FLAGS='--coverage' -DCMAKE_CXX_FLAGS='--coverage'"
+        export CATKIN_TEST_COVERAGE=1
     fi
     ici_with_ws "$target_ws" ici_build_workspace "target" "$extend" "$target_ws"
 
