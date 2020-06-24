@@ -151,22 +151,30 @@ function ici_collect_coverage_report {
 
   case "$coverage_report_tool" in
     "coveralls.io")
-      # Expose .coverage file
-      cp "$target_ws"/.coverage "$COVERAGE_REPORT_PATH" || echo "No python coverage report"
-      # Expose coveragerc file used for coveralls ignore
+      # Combine cpp and python reports locally and expose coverage.json file for coveralls
+      cp "$target_ws"/.coverage "$target_ws/src/$TARGET_REPO_NAME" || echo "No python coverage report"
+      ici_setup_git_client
+      ici_install_pkgs_for_command pip "${PYTHON_VERSION_NAME}-pip" \
+        "${PYTHON_VERSION_NAME}-dev" "${PYTHON_VERSION_NAME}-wheel"
+      "${PYTHON_VERSION_NAME}" -m pip install coveralls
+      # Use coveragerc file used for coveralls ignore
       printf "[report]\nomit = \n\t*/test/*\n\t*/setup.py" > \
-        "$COVERAGE_REPORT_PATH"/.default.coveragerc
+        "$target_ws/src/$TARGET_REPO_NAME/.default.coveragerc"
       if [ -f "$target_ws"/coverage.info ]; then
         # Install and run coveralls-lcov within git directory
         cp "$target_ws"/coverage.info "$target_ws/src/$TARGET_REPO_NAME"
-        ici_setup_git_client
         ici_install_pkgs_for_command gem ruby
         gem install coveralls-lcov
         ( cd "$target_ws/src/$TARGET_REPO_NAME" && \
-          coveralls-lcov coverage.info > \
-          "$COVERAGE_REPORT_PATH"/coverage.c.json )
+          coveralls-lcov -v -n coverage.info > coverage.c.json && \
+          coveralls --merge coverage.c.json \
+                    --rcfile .default.coveragerc \
+                    --output "$COVERAGE_REPORT_PATH"/coverage.json )
       else
         echo "No cpp covearge report"
+        ( cd "$target_ws/src/$TARGET_REPO_NAME" && \
+          coveralls --rcfile .default.coveragerc \
+                    --output "$COVERAGE_REPORT_PATH"/coverage.json )
       fi
       ;;
     *) # Expose LCOV and Cobertura XML files by default
