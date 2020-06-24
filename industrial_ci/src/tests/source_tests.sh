@@ -140,8 +140,7 @@ function ici_combine_python_reports {
 }
 
 function ici_collect_coverage_report {
-  local target_ws=$1; shift
-  local coverage_report_tool=$1
+  local target_ws=$1
 
   # Run combine reports command securely
   # within workspace directory
@@ -149,7 +148,7 @@ function ici_collect_coverage_report {
     ici_combine_cpp_reports && \
     ici_combine_python_reports )
 
-  case "$coverage_report_tool" in
+  case "$CODE_COVERAGE" in
     "coveralls.io")
       # Combine cpp and python reports locally and expose coverage.json file for coveralls
       cp "$target_ws"/.coverage "$target_ws/src/$TARGET_REPO_NAME" || echo "No python coverage report"
@@ -238,7 +237,7 @@ function run_source_tests {
     fi
 
     if [ -n "${CODE_COVERAGE}" ]; then
-        ici_run "collect_target_coverage_report" ici_collect_coverage_report "$target_ws" "$CODE_COVERAGE"
+        ici_run "collect_target_coverage_report" ici_collect_coverage_report "$target_ws"
     fi
 
     extend="$target_ws/install"
