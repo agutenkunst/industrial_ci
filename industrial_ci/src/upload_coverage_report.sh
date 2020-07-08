@@ -24,6 +24,7 @@ function upload_coverage_report {
       bash <(curl -s https://codecov.io/bash) -Z
       ;;
     "coveralls.io")
+      pip install --user --upgrade pip
       pip install --user coveralls
       coveralls --merge=.ici_coverage_report/coverage.json
       ;;
