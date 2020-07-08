@@ -134,8 +134,8 @@ function ici_combine_python_reports {
   # Combine coverage files
   if "$PYTHON_VERSION_NAME" -m coverage combine "${python_reports[@]}"; then
     # Generate report
-    "$PYTHON_VERSION_NAME" -m coverage report --omit=*/test/*,*/setup.py || return 0
-    "$PYTHON_VERSION_NAME" -m coverage xml --omit=*/test/*,*/setup.py
+    "$PYTHON_VERSION_NAME" -m coverage report --omit=build/*,devel/*,*/test/*,*/setup.py || return 0
+    "$PYTHON_VERSION_NAME" -m coverage xml --omit=build/*,devel/*,*/test/*,*/setup.py
   fi
 }
 
@@ -157,8 +157,8 @@ function ici_collect_coverage_report {
         "${PYTHON_VERSION_NAME}-dev" "${PYTHON_VERSION_NAME}-wheel"
       "${PYTHON_VERSION_NAME}" -m pip install coveralls
       # Use coveragerc file used for coveralls ignore
-      printf "[report]\nomit = \n\t*/test/*\n\t*/setup.py" > \
-        "$target_ws/src/$TARGET_REPO_NAME/.default.coveragerc"
+      printf "[report]\nomit = \n\t%s/devel/*\n\t%s/build/*\n\t*/test/*\n\t*/setup.py" "${target_ws}" "${target_ws}" \
+        > "$target_ws/src/$TARGET_REPO_NAME/.default.coveragerc"
       if [ -f "$target_ws"/coverage.info ]; then
         # Install and run coveralls-lcov within git directory
         cp "$target_ws"/coverage.info "$target_ws/src/$TARGET_REPO_NAME"
