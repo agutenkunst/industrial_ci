@@ -134,8 +134,8 @@ function ici_combine_python_reports {
   # Combine coverage files
   if "$PYTHON_VERSION_NAME" -m coverage combine "${python_reports[@]}"; then
     # Generate report
-    "$PYTHON_VERSION_NAME" -m coverage report --omit=build/*,devel/*,*/test/*,*/setup.py || return 0
-    "$PYTHON_VERSION_NAME" -m coverage xml --omit=build/*,devel/*,*/test/*,*/setup.py
+    "$PYTHON_VERSION_NAME" -m coverage report --omit=/opt/*,/root/*,build/*,devel/*,*/test/*,*/setup.py || return 0
+    "$PYTHON_VERSION_NAME" -m coverage xml --omit=/opt/*,/root/*,build/*,devel/*,*/test/*,*/setup.py
   fi
 }
 
