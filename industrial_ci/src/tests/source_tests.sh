@@ -157,7 +157,7 @@ function ici_collect_coverage_report {
         "${PYTHON_VERSION_NAME}-dev" "${PYTHON_VERSION_NAME}-wheel"
       "${PYTHON_VERSION_NAME}" -m pip install coveralls
       # Use coveragerc file used for coveralls ignore
-      printf "[report]\nomit = \n\t%s/devel/*\n\t%s/build/*\n\t*/test/*\n\t*/setup.py" "${target_ws}" "${target_ws}" \
+      printf "[report]\nomit = \n\t%s/root/*\n\t%s/opt/*\n\t%s/devel/*\n\t%s/build/*\n\t*/test/*\n\t*/setup.py" "${target_ws}" "${target_ws}" \
         > "$target_ws/src/$TARGET_REPO_NAME/.default.coveragerc"
       if [ -f "$target_ws"/coverage.info ]; then
         # Install and run coveralls-lcov within git directory
