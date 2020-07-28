@@ -159,6 +159,7 @@ function ici_collect_coverage_report {
       # Use coveragerc file used for coveralls ignore
       printf "[report]\nomit = \n\t%s/root/*\n\t%s/opt/*\n\t%s/devel/*\n\t%s/build/*\n\t*/test/*\n\t*/setup.py" "${target_ws}" "${target_ws}" \
         > "$target_ws/src/$TARGET_REPO_NAME/.default.coveragerc"
+      cat "$target_ws/src/$TARGET_REPO_NAME/.default.coveragerc"
       if [ -f "$target_ws"/coverage.info ]; then
         # Install and run coveralls-lcov within git directory
         cp "$target_ws"/coverage.info "$target_ws/src/$TARGET_REPO_NAME"
@@ -175,6 +176,7 @@ function ici_collect_coverage_report {
           coveralls --rcfile .default.coveragerc \
                     --output "$COVERAGE_REPORT_PATH"/coverage.json )
       fi
+      cat "$COVERAGE_REPORT_PATH"/coverage.json
       ;;
     *) # Expose LCOV and Cobertura XML files by default
       cp "$target_ws"/coverage.info "$COVERAGE_REPORT_PATH" || echo "No cpp coverage report"
